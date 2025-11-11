@@ -74,7 +74,6 @@ enum RunState {
     AwaitingInput,
     PlayerTurn,
     MonsterTurn,
-    Ticking,
 }
 
 struct RainbowRogueState {
@@ -132,11 +131,6 @@ impl GameState for RainbowRogueState {
                 if has_monster_intent {
                     self.run_turn(false); // Monsters acted, player did not
                 }
-                self.run_state = RunState::AwaitingInput;
-            }
-            RunState::Ticking => {
-                // This state could be used for animations or other continuous effects
-                // For now, we'll just transition back to AwaitingInput
                 self.run_state = RunState::AwaitingInput;
             }
         }
