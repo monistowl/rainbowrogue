@@ -228,6 +228,7 @@ impl RainbowRogueState {
         };
         state.seed_floor_monsters(state.active_floor);
         state.record_depth(state.active_floor);
+        state.update_visibility();
         state
     }
 
