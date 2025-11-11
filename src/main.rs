@@ -14,8 +14,8 @@ use data::monsters::MonsterTemplate;
 use ecs::EcsWorld;
 use map::{Dungeon, FloorId, SPECTRUM, Tile, World};
 use render::{HudRing, draw_log, draw_map};
-use serde::{Deserialize, Serialize};
 use scripted_input::ScriptedInput;
+use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, env, fs, io, path::Path};
 
 const SCREEN_HEIGHT: i32 = 50;
@@ -113,36 +113,49 @@ impl Default for RainbowRogueState {
 impl GameState for RainbowRogueState {
     fn tick(&mut self, ctx: &mut BTerm) {
         self.expire_reset_prompt();
-        ctx.cls();
-        self.draw_scene(ctx);
+        let mut player_acted = false;
+        let mut monsters_acted = false;
+        let mut guard = 0;
 
-        let mut turn_advanced = false;
+        loop {
+            guard += 1;
+            if guard > 4 {
+                debug_assert!(false, "turn state machine exceeded expected iterations");
+                break;
+            }
 
-        match self.run_state {
-            RunState::AwaitingInput => {
-                let acted = self.handle_input(ctx);
-                if acted {
-                    self.run_state = RunState::PlayerTurn;
-                    turn_advanced = true;
+            match self.run_state {
+                RunState::AwaitingInput => {
+                    let acted = self.handle_input(ctx);
+                    if acted {
+                        player_acted = true;
+                        self.run_state = RunState::PlayerTurn;
+                        continue;
+                    }
+                    break;
                 }
-            }
-            RunState::PlayerTurn => {
-                self.run_turn(true); // Player acted, so turn advanced
-                self.run_state = RunState::MonsterTurn;
-                turn_advanced = true;
-            }
-            RunState::MonsterTurn => {
-                let has_monster_intent = self.ecs.has_monster_intent();
-                if has_monster_intent {
-                    self.run_turn(false); // Monsters acted, player did not
-                    turn_advanced = true;
+                RunState::PlayerTurn => {
+                    self.run_turn(true);
+                    self.run_state = RunState::MonsterTurn;
+                    continue;
                 }
-                self.run_state = RunState::AwaitingInput;
+                RunState::MonsterTurn => {
+                    let has_monster_intent = self.ecs.has_monster_intent();
+                    if has_monster_intent {
+                        self.run_turn(false);
+                        monsters_acted = true;
+                    }
+                    self.run_state = RunState::AwaitingInput;
+                    break;
+                }
             }
         }
 
-        if self.verbose && turn_advanced {
-            self.dump_verbose_frame(false); // acted is false here as we are dumping after turn
+        ctx.cls();
+        self.draw_scene(ctx);
+
+        if self.verbose && (player_acted || monsters_acted) {
+            self.dump_verbose_frame(player_acted);
         }
     }
 }
@@ -311,7 +324,10 @@ impl RainbowRogueState {
         println!("[RR-DEBUG] Frame: {}, Turn: {}", self.frame, self.ecs.turn);
         println!(
             "[RR-DEBUG] Player Pos: ({}, {}), Floor: {}, World: {}",
-            player_pos.x, player_pos.y, self.active_floor.0, self.active_world.as_str()
+            player_pos.x,
+            player_pos.y,
+            self.active_floor.0,
+            self.active_world.as_str()
         );
         // Dump visible monsters
         let mut monster_positions = Vec::new();
@@ -321,12 +337,18 @@ impl RainbowRogueState {
             false, // Don't include player
             |point, renderable| {
                 if self.visible_tiles.contains(&point) {
-                    monster_positions.push(format!("({}, {}) [{}]", point.x, point.y, renderable.glyph as u8 as char));
+                    monster_positions.push(format!(
+                        "({}, {}) [{}]",
+                        point.x, point.y, renderable.glyph as u8 as char
+                    ));
                 }
             },
         );
         if !monster_positions.is_empty() {
-            println!("[RR-DEBUG] Visible Monsters: {}", monster_positions.join(", "));
+            println!(
+                "[RR-DEBUG] Visible Monsters: {}",
+                monster_positions.join(", ")
+            );
         } else {
             println!("[RR-DEBUG] No visible monsters.");
         }
@@ -406,74 +428,62 @@ impl RainbowRogueState {
             .dungeon
             .active_layer(self.active_floor, self.active_world)
         {
-                        draw_map(
-                            ctx,
-                            layer,
-                            Point::new(MAP_ORIGIN_X, MAP_ORIGIN_Y),
-                            LOG_RESERVED_ROWS,
-                            &self.visible_tiles,
-                        );
-            
-                        // Clear player's old position if they moved (this is now redundant with the below, but kept for clarity)
-                        if let Some(last_point) = self.last_player_point {
-                            let current_point = self.ecs.player_point();
-                            if last_point != current_point {
-                                if let Some(tile) = layer.tile_at(last_point) {
-                                    let screen_x = MAP_ORIGIN_X + last_point.x;
-                                    let screen_y = MAP_ORIGIN_Y + last_point.y;
-                                    ctx.set(
-                                        screen_x,
-                                        screen_y,
-                                        tile.fg,
-                                        RGB::named(BLACK),
-                                        tile.glyph,
-                                    );
-                                }
-                            }
-                        }
-            
-                        // Draw background tiles under all visible entities to ensure no lingering artifacts
-                        self.ecs.each_renderable(
-                            self.active_floor,
-                            self.active_world,
-                            true, // Include player for this pass
-                            |point, _| {
-                                if self.visible_tiles.contains(&point) {
-                                    if let Some(tile) = layer.tile_at(point) {
-                                        let screen_x = MAP_ORIGIN_X + point.x;
-                                        let screen_y = MAP_ORIGIN_Y + point.y;
-                                        ctx.set(
-                                            screen_x,
-                                            screen_y,
-                                            tile.fg,
-                                            RGB::named(BLACK),
-                                            tile.glyph,
-                                        );
-                                    }
-                                }
-                            },
-                        );
-            
-                        self.ecs.each_renderable(
-                            self.active_floor,
-                            self.active_world,
-                            true,
-                            |point, renderable| {
-                                if !self.visible_tiles.contains(&point) {
-                                    return;
-                                }
-                                let screen_x = MAP_ORIGIN_X + point.x;
-                                let screen_y = MAP_ORIGIN_Y + point.y;
-                                ctx.set(
-                                    screen_x,
-                                    screen_y,
-                                    renderable.color,
-                                    RGB::named(BLACK),
-                                    renderable.glyph,
-                                );
-                            },
-                        );
+            draw_map(
+                ctx,
+                layer,
+                Point::new(MAP_ORIGIN_X, MAP_ORIGIN_Y),
+                LOG_RESERVED_ROWS,
+                &self.visible_tiles,
+            );
+
+            // Clear player's old position if they moved (this is now redundant with the below, but kept for clarity)
+            if let Some(last_point) = self.last_player_point {
+                let current_point = self.ecs.player_point();
+                if last_point != current_point {
+                    if let Some(tile) = layer.tile_at(last_point) {
+                        let screen_x = MAP_ORIGIN_X + last_point.x;
+                        let screen_y = MAP_ORIGIN_Y + last_point.y;
+                        ctx.set(screen_x, screen_y, tile.fg, RGB::named(BLACK), tile.glyph);
                     }
+                }
+            }
+
+            // Draw background tiles under all visible entities to ensure no lingering artifacts
+            self.ecs.each_renderable(
+                self.active_floor,
+                self.active_world,
+                true, // Include player for this pass
+                |point, _| {
+                    if self.visible_tiles.contains(&point) {
+                        if let Some(tile) = layer.tile_at(point) {
+                            let screen_x = MAP_ORIGIN_X + point.x;
+                            let screen_y = MAP_ORIGIN_Y + point.y;
+                            ctx.set(screen_x, screen_y, tile.fg, RGB::named(BLACK), tile.glyph);
+                        }
+                    }
+                },
+            );
+
+            self.ecs.each_renderable(
+                self.active_floor,
+                self.active_world,
+                true,
+                |point, renderable| {
+                    if !self.visible_tiles.contains(&point) {
+                        return;
+                    }
+                    let screen_x = MAP_ORIGIN_X + point.x;
+                    let screen_y = MAP_ORIGIN_Y + point.y;
+                    ctx.set(
+                        screen_x,
+                        screen_y,
+                        renderable.color,
+                        RGB::named(BLACK),
+                        renderable.glyph,
+                    );
+                },
+            );
+        }
 
         draw_log(ctx, &self.message_log, LOG_PANEL_START);
         if self.is_dead {
