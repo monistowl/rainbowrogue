@@ -268,14 +268,25 @@ impl RainbowRogueState {
             }
 
             consumed_turn = match key {
-                VirtualKeyCode::Left | VirtualKeyCode::A | VirtualKeyCode::H => {
+                VirtualKeyCode::Left | VirtualKeyCode::A | VirtualKeyCode::H | VirtualKeyCode::Numpad4 => {
                     self.try_step(-1, 0)
                 }
-                VirtualKeyCode::Right | VirtualKeyCode::D | VirtualKeyCode::L => {
+                VirtualKeyCode::Right | VirtualKeyCode::D | VirtualKeyCode::L | VirtualKeyCode::Numpad6 => {
                     self.try_step(1, 0)
                 }
-                VirtualKeyCode::Up | VirtualKeyCode::W | VirtualKeyCode::K => self.try_step(0, -1),
-                VirtualKeyCode::Down | VirtualKeyCode::S | VirtualKeyCode::J => self.try_step(0, 1),
+                VirtualKeyCode::Up | VirtualKeyCode::W | VirtualKeyCode::K | VirtualKeyCode::Numpad8 => {
+                    self.try_step(0, -1)
+                }
+                VirtualKeyCode::Down | VirtualKeyCode::S | VirtualKeyCode::J | VirtualKeyCode::Numpad2 => {
+                    self.try_step(0, 1)
+                }
+
+                // Diagonals
+                VirtualKeyCode::Y | VirtualKeyCode::Numpad7 => self.try_step(-1, -1),
+                VirtualKeyCode::U | VirtualKeyCode::Numpad9 => self.try_step(1, -1),
+                VirtualKeyCode::B | VirtualKeyCode::Numpad1 => self.try_step(-1, 1),
+                VirtualKeyCode::N | VirtualKeyCode::Numpad3 => self.try_step(1, 1),
+
                 VirtualKeyCode::Tab => self.cycle_world(1),
                 VirtualKeyCode::Back => self.cycle_world(-1),
                 VirtualKeyCode::PageUp => self.shift_floor(1),
