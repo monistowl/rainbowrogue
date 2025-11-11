@@ -485,4 +485,10 @@ impl EcsWorld {
 
         log
     }
+
+    pub fn has_monster_intent(&self) -> bool {
+        let intents = self.specs_world.read_component::<IntentStep>();
+        let monsters = self.specs_world.read_component::<MonsterTag>();
+        (&intents, &monsters).join().next().is_some()
+    }
 }

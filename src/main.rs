@@ -93,6 +93,7 @@ struct RainbowRogueState {
     play_history: Vec<String>,
     input_source: InputSource,
     scripted_input: Option<ScriptedInput>,
+    last_player_point: Option<Point>,
 }
 
 impl Default for RainbowRogueState {
@@ -106,7 +107,10 @@ impl GameState for RainbowRogueState {
         self.expire_reset_prompt();
         let acted = self.handle_input(ctx);
         let mut turn_advanced = false;
-        if acted || self.needs_prime_tick {
+
+        let has_monster_intent = self.ecs.has_monster_intent();
+
+        if acted || self.needs_prime_tick || has_monster_intent {
             self.run_turn(acted);
             turn_advanced = true;
         }
@@ -182,6 +186,7 @@ impl RainbowRogueState {
             play_history: Vec::new(),
             input_source,
             scripted_input,
+            last_player_point: Some(player_pos),
         };
         state.seed_floor_monsters(state.active_floor);
         state.record_depth(state.active_floor);
@@ -256,6 +261,7 @@ impl RainbowRogueState {
         if action_taken {
             self.frame = self.frame.wrapping_add(1);
         }
+        self.last_player_point = Some(self.ecs.player_point()); // Store previous player point
         let previous_point = self.ecs.player_point();
         if let Some(layer) = self
             .dungeon
@@ -327,6 +333,24 @@ impl RainbowRogueState {
                 LOG_RESERVED_ROWS,
                 &self.visible_tiles,
             );
+
+            // Clear player's old position if they moved
+            if let Some(last_point) = self.last_player_point {
+                let current_point = self.ecs.player_point();
+                if last_point != current_point {
+                    if let Some(tile) = layer.tile_at(last_point) {
+                        let screen_x = MAP_ORIGIN_X + last_point.x;
+                        let screen_y = MAP_ORIGIN_Y + last_point.y;
+                                            ctx.set(
+                                                screen_x,
+                                                screen_y,
+                                                tile.fg, // Corrected from tile.color
+                                                RGB::named(BLACK),
+                                                tile.glyph,
+                                            );
+                                        }
+                                    }            }
+
             self.ecs.each_renderable(
                 self.active_floor,
                 self.active_world,
