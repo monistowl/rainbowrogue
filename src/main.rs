@@ -113,42 +113,36 @@ impl Default for RainbowRogueState {
 impl GameState for RainbowRogueState {
     fn tick(&mut self, ctx: &mut BTerm) {
         self.expire_reset_prompt();
+        ctx.cls();
+        self.draw_scene(ctx);
 
-        let mut redraw_needed = false; // Flag to indicate if a redraw is necessary
+        let mut turn_advanced = false;
 
         match self.run_state {
             RunState::AwaitingInput => {
                 let acted = self.handle_input(ctx);
                 if acted {
                     self.run_state = RunState::PlayerTurn;
-                    redraw_needed = true; // Input acted, so state will change, redraw
+                    turn_advanced = true;
                 }
             }
             RunState::PlayerTurn => {
                 self.run_turn(true); // Player acted, so turn advanced
                 self.run_state = RunState::MonsterTurn;
-                redraw_needed = true; // State changed, redraw
+                turn_advanced = true;
             }
             RunState::MonsterTurn => {
                 let has_monster_intent = self.ecs.has_monster_intent();
                 if has_monster_intent {
                     self.run_turn(false); // Monsters acted, player did not
-                    redraw_needed = true; // State changed, redraw
+                    turn_advanced = true;
                 }
                 self.run_state = RunState::AwaitingInput;
             }
         }
 
-        // Only redraw if the game state has changed
-        if redraw_needed {
-            ctx.cls();
-            self.draw_scene(ctx);
-        }
-
-        // Verbose frame dump should happen after all state updates for the turn
-        // and before the next input is awaited.
-        if self.verbose && redraw_needed { // Only dump if a redraw happened
-            self.dump_verbose_frame(false);
+        if self.verbose && turn_advanced {
+            self.dump_verbose_frame(false); // acted is false here as we are dumping after turn
         }
     }
 }
@@ -283,6 +277,9 @@ impl RainbowRogueState {
                 }
                 VirtualKeyCode::Escape => {
                     ctx.quit();
+                    if matches!(self.input_source, InputSource::Scripted) {
+                        std::process::exit(0); // Force exit for scripted runs
+                    }
                     false
                 }
                 VirtualKeyCode::Period => {
