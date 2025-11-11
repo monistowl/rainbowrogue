@@ -1,0 +1,12 @@
+# Test script 1
+# Move around a bit
+
+right
+right
+down
+down
+left
+cycle
+cycle
+wait
+quit

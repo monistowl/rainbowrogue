@@ -23,13 +23,10 @@ impl ScriptedInput {
                 continue; // Skip empty lines and comments
             }
 
-            // Parse each character in the line as a keypress
-            for char_code in trimmed_line.chars() {
-                if let Some(key) = char_to_virtualkeycode(char_code) {
-                    script_commands.push(key);
-                } else {
-                    eprintln!("Warning: Unknown key in script: {}", char_code);
-                }
+            if let Some(key) = string_to_virtualkeycode(trimmed_line) {
+                script_commands.push(key);
+            } else {
+                eprintln!("Warning: Unknown command in script: {}", trimmed_line);
             }
         }
 
@@ -50,30 +47,25 @@ impl ScriptedInput {
     }
 }
 
-fn char_to_virtualkeycode(c: char) -> Option<VirtualKeyCode> {
-    match c {
-        'w' | 'W' => Some(VirtualKeyCode::W),
-        'a' | 'A' => Some(VirtualKeyCode::A),
-        's' | 'S' => Some(VirtualKeyCode::S),
-        'd' | 'D' => Some(VirtualKeyCode::D),
-        'h' | 'H' => Some(VirtualKeyCode::H),
-        'j' | 'J' => Some(VirtualKeyCode::J),
-        'k' | 'K' => Some(VirtualKeyCode::K),
-        'l' | 'L' => Some(VirtualKeyCode::L),
-        '<' => Some(VirtualKeyCode::PageUp), // Ascend
-        '>' => Some(VirtualKeyCode::PageDown), // Descend
-        '\t' => Some(VirtualKeyCode::Tab), // Cycle world forward
-        '!' => Some(VirtualKeyCode::Back), // Cycle world backward (using '!' as a placeholder for Backspace/Shift+Tab)
-        '1' => Some(VirtualKeyCode::Key1),
-        '2' => Some(VirtualKeyCode::Key2),
-        '3' => Some(VirtualKeyCode::Key3),
-        '4' => Some(VirtualKeyCode::Key4),
-        'r' | 'R' => Some(VirtualKeyCode::R),
-        'q' | 'Q' => Some(VirtualKeyCode::Escape), // Explicit QUIT command
-        '.' => Some(VirtualKeyCode::Period), // Explicit WAIT command
-        't' | 'T' => Some(VirtualKeyCode::T), // Step Turn command
-        'p' | 'P' => Some(VirtualKeyCode::P), // Dump State command
-        '\x1B' => Some(VirtualKeyCode::Escape), // Escape character
+fn string_to_virtualkeycode(s: &str) -> Option<VirtualKeyCode> {
+    match s.to_lowercase().as_str() {
+        "up" | "k" | "w" => Some(VirtualKeyCode::Up),
+        "down" | "j" | "s" => Some(VirtualKeyCode::Down),
+        "left" | "h" | "a" => Some(VirtualKeyCode::Left),
+        "right" | "l" | "d" => Some(VirtualKeyCode::Right),
+        "ascend" | "<" => Some(VirtualKeyCode::PageDown),
+        "descend" | ">" => Some(VirtualKeyCode::PageUp),
+        "cycle" | "tab" => Some(VirtualKeyCode::Tab),
+        "cycle_rev" | "backtab" => Some(VirtualKeyCode::Back),
+        "item1" | "1" => Some(VirtualKeyCode::Key1),
+        "item2" | "2" => Some(VirtualKeyCode::Key2),
+        "item3" | "3" => Some(VirtualKeyCode::Key3),
+        "item4" | "4" => Some(VirtualKeyCode::Key4),
+        "reset" | "r" => Some(VirtualKeyCode::R),
+        "quit" | "q" | "escape" => Some(VirtualKeyCode::Escape),
+        "wait" | "." => Some(VirtualKeyCode::Period),
+        "turn" | "t" => Some(VirtualKeyCode::T),
+        "dump" | "p" => Some(VirtualKeyCode::P),
         _ => None,
     }
 }

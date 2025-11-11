@@ -6,7 +6,7 @@ edition = "2024"
 resolver = "2"
 
 [dependencies]
-bracket-terminal = { version = "0.8.7", default-features = false, features = ["cross_term"] }
+bracket-terminal = { version = "0.8.7" }
 bracket-geometry = "0.8.7"
 bracket-pathfinding = "0.8.7"
 bracket-noise = "0.8.7"

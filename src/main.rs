@@ -10,7 +10,7 @@ use bracket_geometry::prelude::Point;
 use bracket_random::prelude::RandomNumberGenerator;
 use bracket_terminal::prelude::*;
 use chrono;
-use crossterm::terminal;
+
 use data::monsters::MonsterTemplate;
 use ecs::EcsWorld;
 use map::{Dungeon, FloorId, SPECTRUM, Tile, World};
@@ -150,7 +150,7 @@ impl GameState for RainbowRogueState {
             }
         }
 
-        ctx.cls();
+        ctx.cls_bg(BLACK);
         self.draw_scene(ctx);
 
         if self.verbose && (player_acted || monsters_acted) {
@@ -452,7 +452,8 @@ impl RainbowRogueState {
                 self.active_floor,
                 self.active_world,
                 true, // Include player for this pass
-                |point, _| {
+                |point, _|
+                 {
                     if self.visible_tiles.contains(&point) {
                         if let Some(tile) = layer.tile_at(point) {
                             let screen_x = MAP_ORIGIN_X + point.x;
@@ -630,10 +631,7 @@ impl RainbowRogueState {
             .entity_at(target, self.active_floor, self.active_world)
         {
             if entity != self.ecs.player_entity() {
-                if let Some(report) =
-                    self.ecs
-                        .player_attack(target, self.active_floor, self.active_world)
-                {
+                if let Some(report) = self.ecs.player_attack(target, self.active_floor, self.active_world) {
                     self.push_log_entry(report.hit);
                     if let Some(kill) = report.kill {
                         self.push_log_entry(kill);
@@ -704,7 +702,7 @@ impl RainbowRogueState {
                 .filter(|point| !previous.contains(point))
                 .count();
             if newly_visible > 0 {
-                self.push_log_entry(format!(
+self.push_log_entry(format!(
                     "Glimpsed {newly_visible} new tiles in {}",
                     self.active_world.as_str()
                 ));
@@ -877,9 +875,9 @@ impl RainbowRogueState {
         *self = Self::bootstrap(next_stats);
         self.persist_run_stats();
         self.push_log_entry(format!(
-            "Run {} anchors. Best depth {}.",
-            self.run_stats.run_number, self.run_stats.best_depth
-        ));
+                    "Run {} anchors. Best depth {}",
+                    self.run_stats.run_number, self.run_stats.best_depth
+                ));
     }
 
     fn draw_game_over(&self, ctx: &mut BTerm) {
@@ -924,30 +922,21 @@ impl Drop for RainbowRogueState {
 }
 
 fn main() -> BError {
-    let (console_width, console_height) = console_dimensions();
-    let builder = BTermBuilder::simple(console_width, console_height)?
-        .with_title("RainbowRogue · Spectrum Seed");
-    let context = builder.build()?;
+    let args: Vec<String> = env::args().collect();
+    let is_scripted = args.iter().any(|arg| arg == "--scripted-input");
+
+    let (console_width, console_height) = console_dimensions(is_scripted);
+    let context = BTermBuilder::simple(console_width, console_height)?
+        .with_title("RainbowRogue · Spectrum Seed")
+        .with_font("vga8x16.png", 8, 16)
+        .with_tile_dimensions(8, 16)
+
+        .build()?;
+
     let game_state = RainbowRogueState::default();
     main_loop(context, game_state)
 }
 
-fn console_dimensions() -> (u32, u32) {
-    const DEFAULT_WIDTH: u32 = 80;
-    const DEFAULT_HEIGHT: u32 = 50;
-
-    match terminal::size() {
-        Ok((cols, rows)) if cols > 0 && rows > 0 => {
-            let width = DEFAULT_WIDTH.min(cols as u32);
-            let height = DEFAULT_HEIGHT.min(rows as u32);
-            if width < DEFAULT_WIDTH || height < DEFAULT_HEIGHT {
-                eprintln!(
-                    "[RR] Terminal is {}x{}; clamping console to {}x{} to avoid bracket overflow.",
-                    cols, rows, width, height
-                );
-            }
-            (width.max(1), height.max(1))
-        }
-        _ => (DEFAULT_WIDTH, DEFAULT_HEIGHT),
-    }
+fn console_dimensions(_is_scripted: bool) -> (i32, i32) {
+    (132, 43)
 }
