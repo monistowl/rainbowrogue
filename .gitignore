@@ -16,6 +16,9 @@ target
 # Runtime metadata
 run_stats.json
 
+# Ephemeral planning + session logs
+history/
+
 # Local package manager artifacts
 signal-desktop-keyring.gpg
 signal-desktop.sources
