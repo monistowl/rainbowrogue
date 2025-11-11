@@ -16,6 +16,10 @@ target
 # Runtime metadata
 run_stats.json
 
+# Local package manager artifacts
+signal-desktop-keyring.gpg
+signal-desktop.sources
+
 # RustRover
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
 #  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
