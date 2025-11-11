@@ -46,14 +46,32 @@ impl HudRing {
 }
 
 pub fn draw_log(ctx: &mut BTerm, log: &[String], start_y: i32) {
-    let (width, _) = ctx.get_char_size();
-    let height = (log.len() as i32).min(5) + 2;
-    let top = (start_y - 1).max(0);
+    let (width_raw, height_raw) = ctx.get_char_size();
+    let width = width_raw.saturating_sub(1);
+    let screen_h = height_raw as i32;
+    if screen_h <= 0 || width <= 0 {
+        return;
+    }
+
+    let mut top = (start_y - 1).max(0);
+    if top >= screen_h {
+        top = screen_h.saturating_sub(2);
+    }
+
+    let max_height = screen_h.saturating_sub(top).max(1);
+    let mut box_height = (log.len() as i32).min(5) + 2;
+    if box_height > max_height {
+        box_height = max_height;
+    }
+    if box_height < 2 {
+        return;
+    }
+
     ctx.draw_box(
         0,
         top,
-        width - 1,
-        height,
+        width,
+        box_height,
         RGB::named(DARK_GRAY),
         RGB::named(BLACK),
     );
@@ -64,8 +82,14 @@ pub fn draw_log(ctx: &mut BTerm, log: &[String], start_y: i32) {
         RGB::named(BLACK),
         "Event Log",
     );
-    for (row, entry) in log.iter().take(5).enumerate() {
-        ctx.print(2, top + 2 + row as i32, entry);
+
+    let rows_available = box_height.saturating_sub(2) as usize;
+    for (row, entry) in log.iter().take(rows_available).enumerate() {
+        let y = top + 2 + row as i32;
+        if y >= screen_h {
+            break;
+        }
+        ctx.print(2, y, entry);
     }
 }
 

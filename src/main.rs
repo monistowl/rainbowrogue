@@ -18,11 +18,9 @@ use scripted_input::ScriptedInput;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, env, fs, io, path::Path};
 
-const SCREEN_HEIGHT: i32 = 50;
 const MAP_ORIGIN_X: i32 = 2;
 const MAP_ORIGIN_Y: i32 = 7;
 const LOG_RESERVED_ROWS: i32 = 7;
-const LOG_PANEL_START: i32 = SCREEN_HEIGHT - 6;
 const LOG_MAX_ENTRIES: usize = 8;
 const RUN_STATS_PATH: &str = "run_stats.json";
 const RESET_CONFIRM_WINDOW_FRAMES: u64 = 300; // ~5 seconds at 60 FPS
@@ -485,10 +483,26 @@ impl RainbowRogueState {
             );
         }
 
-        draw_log(ctx, &self.message_log, LOG_PANEL_START);
+        let (_, screen_h_raw) = ctx.get_char_size();
+        let screen_h = screen_h_raw as i32;
+        let log_panel_start = self.calculate_log_start(screen_h);
+        draw_log(ctx, &self.message_log, log_panel_start);
         if self.is_dead {
             self.draw_game_over(ctx);
         }
+    }
+
+    fn calculate_log_start(&self, screen_height: i32) -> i32 {
+        if screen_height <= 0 {
+            return 0;
+        }
+        let min_anchor = MAP_ORIGIN_Y + 5;
+        let mut start = screen_height.saturating_sub(LOG_RESERVED_ROWS + 1);
+        if start < min_anchor {
+            start = min_anchor;
+        }
+        start = start.min(screen_height.saturating_sub(2));
+        start.max(1)
     }
 
     fn dump_verbose_frame(&self, action_taken: bool) {
@@ -868,24 +882,24 @@ impl RainbowRogueState {
     }
 
     fn draw_game_over(&self, ctx: &mut BTerm) {
-        let (width, _) = ctx.get_char_size();
+        let (width_raw, height_raw) = ctx.get_char_size();
+        let screen_h = height_raw as i32;
         let banner = "S P E C T R U M   S H A T T E R E D";
         let hint = "Press R to restart or Esc to quit.";
+        let box_top = (MAP_ORIGIN_Y + 6).min(screen_h.saturating_sub(8));
+        let box_height = 6.min(screen_h.saturating_sub(box_top).saturating_sub(1).max(3));
         ctx.draw_box(
             1,
-            MAP_ORIGIN_Y + 6,
-            width - 2,
-            6,
+            box_top,
+            width_raw.saturating_sub(2),
+            box_height,
             RGB::named(DARK_GRAY),
             RGB::named(BLACK),
         );
-        ctx.print_color_centered(MAP_ORIGIN_Y + 8, RGB::named(RED), RGB::named(BLACK), banner);
-        ctx.print_color_centered(
-            MAP_ORIGIN_Y + 10,
-            RGB::named(WHITE),
-            RGB::named(BLACK),
-            hint,
-        );
+        let banner_y = (box_top + 2).min(screen_h.saturating_sub(2));
+        let hint_y = (banner_y + 2).min(screen_h.saturating_sub(1));
+        ctx.print_color_centered(banner_y, RGB::named(RED), RGB::named(BLACK), banner);
+        ctx.print_color_centered(hint_y, RGB::named(WHITE), RGB::named(BLACK), hint);
     }
 }
 
