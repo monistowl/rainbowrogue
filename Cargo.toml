@@ -1,0 +1,15 @@
+[package]
+name = "rainbowrogue"
+version = "0.1.0"
+edition = "2024"
+
+resolver = "2"
+
+[dependencies]
+bracket-terminal = { version = "0.8.7", default-features = false, features = ["cross_term"] }
+bracket-geometry = "0.8.7"
+bracket-pathfinding = "0.8.7"
+bracket-noise = "0.8.7"
+bracket-random = "0.8.7"
+specs = { version = "0.19", features = ["parallel"] }
+smallvec = "1.13"
