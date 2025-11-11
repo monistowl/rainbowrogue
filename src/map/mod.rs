@@ -100,7 +100,7 @@ fn corridor_path(start: Point, end: Point) -> Vec<Point> {
     path
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FloorId(pub u32);
 
 #[derive(Clone, Debug)]
@@ -240,6 +240,11 @@ impl Default for Tile {
 }
 
 impl Tile {
+    pub const TAG_WALL: u32 = 0;
+    pub const TAG_FLOOR: u32 = 1;
+    pub const TAG_STAIR_UP: u32 = 2;
+    pub const TAG_STAIR_DOWN: u32 = 3;
+
     pub fn wall() -> Self {
         Self {
             glyph: b'#' as u16,
@@ -247,7 +252,7 @@ impl Tile {
             bg: RGB::named(BLACK),
             blocks_move: true,
             blocks_sight: true,
-            tag: 0,
+            tag: Self::TAG_WALL,
             revealed: false,
         }
     }
@@ -259,7 +264,7 @@ impl Tile {
             bg: RGB::named(BLACK),
             blocks_move: false,
             blocks_sight: false,
-            tag: 1,
+            tag: Self::TAG_FLOOR,
             revealed: false,
         }
     }
@@ -271,7 +276,7 @@ impl Tile {
             bg: RGB::named(BLACK),
             blocks_move: false,
             blocks_sight: false,
-            tag: 2,
+            tag: Self::TAG_STAIR_UP,
             revealed: false,
         }
     }
@@ -283,7 +288,7 @@ impl Tile {
             bg: RGB::named(BLACK),
             blocks_move: false,
             blocks_sight: false,
-            tag: 3,
+            tag: Self::TAG_STAIR_DOWN,
             revealed: false,
         }
     }
@@ -450,19 +455,55 @@ impl WorldFloor {
     pub fn spawn_point(&self) -> Point {
         self.substrate.spawn
     }
+
+    pub fn stairs_up(&self) -> &[Point] {
+        &self.substrate.stairs_up
+    }
+
+    pub fn stairs_down(&self) -> &[Point] {
+        &self.substrate.stairs_down
+    }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct Dungeon {
     pub floors: Vec<WorldFloor>,
+    width: i32,
+    height: i32,
+    seed: u64,
 }
 
 impl Dungeon {
+    pub fn new(width: i32, height: i32, seed: u64) -> Self {
+        let mut dungeon = Self {
+            floors: Vec::new(),
+            width,
+            height,
+            seed,
+        };
+        dungeon.ensure_floor(FloorId(0));
+        dungeon
+    }
+
     pub fn scaffolding_demo() -> Self {
-        let floor = WorldFloor::demo(FloorId(0), DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT);
-        Self {
-            floors: vec![floor],
+        Self::new(DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT, 0x51eccafe)
+    }
+
+    pub fn ensure_floor(&mut self, floor: FloorId) -> bool {
+        let mut created = false;
+        while self.floors.len() <= floor.0 as usize {
+            let id = FloorId(self.floors.len() as u32);
+            let floor_seed = self.floor_seed(id);
+            let new_floor = WorldFloor::from_seed(id, self.width, self.height, floor_seed);
+            self.floors.push(new_floor);
+            created = true;
         }
+        created
+    }
+
+    fn floor_seed(&self, floor: FloorId) -> u64 {
+        let spread = 0x9e37_79b9_7f4a_7c15u64;
+        self.seed ^ ((floor.0 as u64 + 1).wrapping_mul(spread))
     }
 
     pub fn active_floor(&self, floor: FloorId) -> Option<&WorldFloor> {
@@ -489,5 +530,11 @@ impl Dungeon {
         self.active_layer(floor, world)
             .map(|layer| layer.is_walkable(point))
             .unwrap_or(false)
+    }
+}
+
+impl Default for Dungeon {
+    fn default() -> Self {
+        Self::scaffolding_demo()
     }
 }
