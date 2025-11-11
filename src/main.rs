@@ -925,10 +925,9 @@ impl Drop for RainbowRogueState {
 
 fn main() -> BError {
     let (console_width, console_height) = console_dimensions();
-    let context = BTermBuilder::simple80x50()
-        .with_dimensions(console_width, console_height)
-        .with_title("RainbowRogue · Spectrum Seed")
-        .build()?;
+    let builder = BTermBuilder::simple(console_width, console_height)?
+        .with_title("RainbowRogue · Spectrum Seed");
+    let context = builder.build()?;
     let game_state = RainbowRogueState::default();
     main_loop(context, game_state)
 }
