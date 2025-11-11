@@ -10,6 +10,7 @@ use bracket_geometry::prelude::Point;
 use bracket_random::prelude::RandomNumberGenerator;
 use bracket_terminal::prelude::*;
 use chrono;
+use crossterm::terminal;
 use data::monsters::MonsterTemplate;
 use ecs::EcsWorld;
 use map::{Dungeon, FloorId, SPECTRUM, Tile, World};
@@ -923,9 +924,31 @@ impl Drop for RainbowRogueState {
 }
 
 fn main() -> BError {
+    let (console_width, console_height) = console_dimensions();
     let context = BTermBuilder::simple80x50()
+        .with_dimensions(console_width, console_height)
         .with_title("RainbowRogue · Spectrum Seed")
         .build()?;
     let game_state = RainbowRogueState::default();
     main_loop(context, game_state)
+}
+
+fn console_dimensions() -> (u32, u32) {
+    const DEFAULT_WIDTH: u32 = 80;
+    const DEFAULT_HEIGHT: u32 = 50;
+
+    match terminal::size() {
+        Ok((cols, rows)) if cols > 0 && rows > 0 => {
+            let width = DEFAULT_WIDTH.min(cols as u32);
+            let height = DEFAULT_HEIGHT.min(rows as u32);
+            if width < DEFAULT_WIDTH || height < DEFAULT_HEIGHT {
+                eprintln!(
+                    "[RR] Terminal is {}x{}; clamping console to {}x{} to avoid bracket overflow.",
+                    cols, rows, width, height
+                );
+            }
+            (width.max(1), height.max(1))
+        }
+        _ => (DEFAULT_WIDTH, DEFAULT_HEIGHT),
+    }
 }
