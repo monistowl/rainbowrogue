@@ -15,7 +15,7 @@ RainbowRogue drops you into a stacked dungeon where every floor exists simultane
 ## Quick Start
 ### Prerequisites
 - Rust toolchain (1.80+ recommended; install via [rustup](https://rustup.rs)).
-- A Unicode-friendly terminal; `bracket-terminal` defaults to crossterm on desktop.
+- A Unicode-friendly terminal.
 
 ### Build & run
 ```bash
@@ -29,7 +29,6 @@ cargo run
 # for smoother animation and optimized AI ticks
 cargo run --release
 ```
-_The window opens at 80x50 characters; resize your terminal beforehand for best results._
 
 ### Troubleshooting
 - On macOS, grant the terminal “Input Monitoring” to ensure crossterm receives PageUp/PageDown events.
@@ -46,12 +45,23 @@ Descend through as many dungeon floors as you can, unify the spectrum by activat
 ### Controls
 | Action | Keys |
 | --- | --- |
-| Move (orthogonal) | Arrow keys, `WASD`, or `HJKL` |
+| Move Up | `Up Arrow`, `W`, `K`, `Numpad 8` |
+| Move Down | `Down Arrow`, `S`, `J`, `Numpad 2` |
+| Move Left | `Left Arrow`, `A`, `H`, `Numpad 4` |
+| Move Right | `Right Arrow`, `D`, `L`, `Numpad 6` |
+| Move Up-Left | `Y`, `Numpad 7` |
+| Move Up-Right | `U`, `Numpad 9` |
+| Move Down-Left | `B`, `Numpad 1` |
+| Move Down-Right | `N`, `Numpad 3` |
+| Wait | `.` |
 | Cycle worlds forward/backward | `Tab` / `Backspace` |
 | Change dungeon floor | `PageUp` (descend while on `>`) / `PageDown` (ascend while on `<`) |
 | Restart run / reset stats | `R` (restart after death; double-press while alive to wipe run stats) |
 | Use quickbar item slots | `1`–`4` |
 | Close the game | `Esc` or close the terminal window |
+| **Debug:** Step Turn | `T` (forces a turn advancement) |
+| **Debug:** Dump State | `P` (dumps current game state to verbose log) |
+
 
 Tips:
 - Movement spends a turn even if blocked; watch the combat log to know whether you bumped an enemy or a wall.
@@ -66,6 +76,24 @@ Tips:
 - **HUD ring**: Seven wedges represent ROYGBIV worlds with cooldown pips and modifiers.
 - **Quickbar**: Appears on row 5 with `[slot] name (uses)` entries for consumables bound to keys `1`–`4`.
 - **Message log**: Bottom six rows narrate movement, discoveries, combat rolls, and health warnings.
+
+### The Seven Worlds
+Each world has its own unique properties, monsters, and tactical considerations.
+
+- **Red World**: "Heat blooms amplify melee damage."
+  - **Monsters**: Ember Imp, Cinder Wolf
+- **Orange World**: "Chemical clouds respond to wind tunnels."
+  - **Monsters**: Acid Puff, Flask Golem
+- **Yellow World**: "Lens-prisms extend FOV and detect traps."
+  - **Monsters**: Prism Ghost, Sun Mite
+- **Green World**: "Regrowth tiles slowly mend allies."
+  - **Monsters**: Thorn Hopper, Bloom Sentinel
+- **Blue World**: "Stillwater grants crit bonuses to ranged."
+  - **Monsters**: Glacier Crab, Stillwater Shade
+- **Indigo World**: "Mindstorms favor teleport talent rolls."
+  - **Monsters**: Mindworm, Phase Stalker
+- **Violet World**: "Curses thread through unseen resonance."
+  - **Monsters**: Hex Bat, Veil Revenant
 
 ### Traversal & combat
 1. **Substrate awareness**: Every floor shares geometry across worlds; walls in one plane might be passable or hazardous in another.
