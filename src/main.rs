@@ -9,6 +9,7 @@ use ai::BehaviorContext;
 use bracket_geometry::prelude::Point;
 use bracket_random::prelude::RandomNumberGenerator;
 use bracket_terminal::prelude::*;
+use chrono;
 use data::monsters::MonsterTemplate;
 use ecs::EcsWorld;
 use map::{Dungeon, FloorId, SPECTRUM, Tile, World};
@@ -283,10 +284,55 @@ impl RainbowRogueState {
                     // This is a "wait" command, consumes a turn but does nothing
                     true
                 }
+                VirtualKeyCode::T => {
+                    // Step Turn command: forces a turn advancement
+                    self.run_state = RunState::PlayerTurn; // Force player turn to trigger run_turn
+                    true
+                }
+                VirtualKeyCode::P => {
+                    // Dump State command: dumps current game state to verbose log
+                    self.dump_current_state();
+                    false // Does not consume a turn
+                }
                 _ => false,
             };
         }
         consumed_turn
+    }
+
+    fn dump_current_state(&self) {
+        if !self.verbose {
+            return;
+        }
+        let player_pos = self.ecs.player_point();
+        println!("[RR-DEBUG] --- Current Game State ---");
+        println!("[RR-DEBUG] Frame: {}, Turn: {}", self.frame, self.ecs.turn);
+        println!(
+            "[RR-DEBUG] Player Pos: ({}, {}), Floor: {}, World: {}",
+            player_pos.x, player_pos.y, self.active_floor.0, self.active_world.as_str()
+        );
+        // Dump visible monsters
+        let mut monster_positions = Vec::new();
+        self.ecs.each_renderable(
+            self.active_floor,
+            self.active_world,
+            false, // Don't include player
+            |point, renderable| {
+                if self.visible_tiles.contains(&point) {
+                    monster_positions.push(format!("({}, {}) [{}]", point.x, point.y, renderable.glyph as u8 as char));
+                }
+            },
+        );
+        if !monster_positions.is_empty() {
+            println!("[RR-DEBUG] Visible Monsters: {}", monster_positions.join(", "));
+        } else {
+            println!("[RR-DEBUG] No visible monsters.");
+        }
+        println!("[RR-DEBUG] Message Log (last 3):");
+        for entry in self.message_log.iter().take(3) {
+            println!("[RR-DEBUG]   {}", entry);
+        }
+        println!("[RR-DEBUG] --------------------------");
     }
 
     fn run_turn(&mut self, action_taken: bool) {
@@ -813,17 +859,24 @@ impl Drop for RainbowRogueState {
         if !self.verbose {
             return;
         }
-        println!("=== RainbowRogue Verbose Log Start ===");
-        for entry in &self.play_history {
-            println!("{entry}");
+        let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S").to_string();
+        let filename = format!("history/play_history_{}.log", timestamp);
+        if let Err(e) = fs::create_dir_all("history") {
+            eprintln!("Failed to create history directory: {}", e);
+            return;
         }
-        println!("=== RainbowRogue Verbose Log End ===");
+        if let Err(e) = fs::write(&filename, self.play_history.join("\n")) {
+            eprintln!("Failed to write play history to {}: {}", filename, e);
+        } else {
+            println!("Play history saved to {}", filename);
+        }
     }
 }
 
 fn main() -> BError {
     let context = BTermBuilder::simple80x50()
         .with_title("RainbowRogue · Spectrum Seed")
+        .with_fps_cap(30.0) // Set a lower FPS cap
         .build()?;
     let game_state = RainbowRogueState::default();
     main_loop(context, game_state)
