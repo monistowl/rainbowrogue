@@ -70,6 +70,13 @@ enum InputSource {
     Scripted,
 }
 
+enum RunState {
+    AwaitingInput,
+    PlayerTurn,
+    MonsterTurn,
+    Ticking,
+}
+
 struct RainbowRogueState {
     dungeon: Dungeon,
     ecs: EcsWorld,
@@ -94,6 +101,7 @@ struct RainbowRogueState {
     input_source: InputSource,
     scripted_input: Option<ScriptedInput>,
     last_player_point: Option<Point>,
+    run_state: RunState,
 }
 
 impl Default for RainbowRogueState {
@@ -105,19 +113,42 @@ impl Default for RainbowRogueState {
 impl GameState for RainbowRogueState {
     fn tick(&mut self, ctx: &mut BTerm) {
         self.expire_reset_prompt();
-        let acted = self.handle_input(ctx);
-        let mut turn_advanced = false;
-
-        let has_monster_intent = self.ecs.has_monster_intent();
-
-        if acted || self.needs_prime_tick || has_monster_intent {
-            self.run_turn(acted);
-            turn_advanced = true;
-        }
         ctx.cls();
         self.draw_scene(ctx);
-        if self.verbose && turn_advanced {
-            self.dump_verbose_frame(acted);
+
+        match self.run_state {
+            RunState::AwaitingInput => {
+                let acted = self.handle_input(ctx);
+                if acted {
+                    self.run_state = RunState::PlayerTurn;
+                }
+            }
+            RunState::PlayerTurn => {
+                self.run_turn(true); // Player acted, so turn advanced
+                self.run_state = RunState::MonsterTurn;
+            }
+            RunState::MonsterTurn => {
+                let has_monster_intent = self.ecs.has_monster_intent();
+                if has_monster_intent {
+                    self.run_turn(false); // Monsters acted, player did not
+                }
+                self.run_state = RunState::AwaitingInput;
+            }
+            RunState::Ticking => {
+                // This state could be used for animations or other continuous effects
+                // For now, we'll just transition back to AwaitingInput
+                self.run_state = RunState::AwaitingInput;
+            }
+        }
+
+        if self.verbose {
+            // Verbose frame dump should happen after all state updates for the turn
+            // and before the next input is awaited.
+            // For now, we'll dump if a turn was advanced.
+            // A more precise check might be needed if Ticking state is used for actual continuous updates.
+            if matches!(self.run_state, RunState::AwaitingInput) && self.ecs.turn > 0 {
+                self.dump_verbose_frame(false); // acted is false here as we are dumping after turn
+            }
         }
     }
 }
@@ -187,6 +218,7 @@ impl RainbowRogueState {
             input_source,
             scripted_input,
             last_player_point: Some(player_pos),
+            run_state: RunState::AwaitingInput,
         };
         state.seed_floor_monsters(state.active_floor);
         state.record_depth(state.active_floor);
@@ -204,10 +236,12 @@ impl RainbowRogueState {
             InputSource::Scripted => {
                 let k = self.scripted_input.as_mut().and_then(|si| si.next_key());
                 if k.is_none() {
-                    // If script is exhausted, quit the game
-                    ctx.quit();
+                    // If script is exhausted, signal to quit the game
+                    // by returning VirtualKeyCode::Escape, which will be handled below.
+                    Some(VirtualKeyCode::Escape)
+                } else {
+                    k
                 }
-                k
             }
         };
 
@@ -250,6 +284,10 @@ impl RainbowRogueState {
                 VirtualKeyCode::Escape => {
                     ctx.quit();
                     false
+                }
+                VirtualKeyCode::Period => {
+                    // This is a "wait" command, consumes a turn but does nothing
+                    true
                 }
                 _ => false,
             };

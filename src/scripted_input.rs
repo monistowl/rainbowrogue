@@ -69,6 +69,8 @@ fn char_to_virtualkeycode(c: char) -> Option<VirtualKeyCode> {
         '3' => Some(VirtualKeyCode::Key3),
         '4' => Some(VirtualKeyCode::Key4),
         'r' | 'R' => Some(VirtualKeyCode::R),
+        'q' | 'Q' => Some(VirtualKeyCode::Escape), // Explicit QUIT command
+        '.' => Some(VirtualKeyCode::Period), // Explicit WAIT command
         '\x1B' => Some(VirtualKeyCode::Escape), // Escape character
         _ => None,
     }
