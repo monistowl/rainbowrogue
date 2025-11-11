@@ -1,5 +1,6 @@
 # RainbowRogue
 ![image](./screenshot.png)
+
 _Console-native roguelike exploring a seven-world (4D) dungeon rendered with `bracket-lib`._
 
 ## Description
