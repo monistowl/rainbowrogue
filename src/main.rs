@@ -113,37 +113,42 @@ impl Default for RainbowRogueState {
 impl GameState for RainbowRogueState {
     fn tick(&mut self, ctx: &mut BTerm) {
         self.expire_reset_prompt();
-        ctx.cls();
-        self.draw_scene(ctx);
+
+        let mut redraw_needed = false; // Flag to indicate if a redraw is necessary
 
         match self.run_state {
             RunState::AwaitingInput => {
                 let acted = self.handle_input(ctx);
                 if acted {
                     self.run_state = RunState::PlayerTurn;
+                    redraw_needed = true; // Input acted, so state will change, redraw
                 }
             }
             RunState::PlayerTurn => {
                 self.run_turn(true); // Player acted, so turn advanced
                 self.run_state = RunState::MonsterTurn;
+                redraw_needed = true; // State changed, redraw
             }
             RunState::MonsterTurn => {
                 let has_monster_intent = self.ecs.has_monster_intent();
                 if has_monster_intent {
                     self.run_turn(false); // Monsters acted, player did not
+                    redraw_needed = true; // State changed, redraw
                 }
                 self.run_state = RunState::AwaitingInput;
             }
         }
 
-        if self.verbose {
-            // Verbose frame dump should happen after all state updates for the turn
-            // and before the next input is awaited.
-            // For now, we'll dump if a turn was advanced.
-            // A more precise check might be needed if Ticking state is used for actual continuous updates.
-            if matches!(self.run_state, RunState::AwaitingInput) && self.ecs.turn > 0 {
-                self.dump_verbose_frame(false); // acted is false here as we are dumping after turn
-            }
+        // Only redraw if the game state has changed
+        if redraw_needed {
+            ctx.cls();
+            self.draw_scene(ctx);
+        }
+
+        // Verbose frame dump should happen after all state updates for the turn
+        // and before the next input is awaited.
+        if self.verbose && redraw_needed { // Only dump if a redraw happened
+            self.dump_verbose_frame(false);
         }
     }
 }
@@ -404,51 +409,74 @@ impl RainbowRogueState {
             .dungeon
             .active_layer(self.active_floor, self.active_world)
         {
-            draw_map(
-                ctx,
-                layer,
-                Point::new(MAP_ORIGIN_X, MAP_ORIGIN_Y),
-                LOG_RESERVED_ROWS,
-                &self.visible_tiles,
-            );
-
-            // Clear player's old position if they moved
-            if let Some(last_point) = self.last_player_point {
-                let current_point = self.ecs.player_point();
-                if last_point != current_point {
-                    if let Some(tile) = layer.tile_at(last_point) {
-                        let screen_x = MAP_ORIGIN_X + last_point.x;
-                        let screen_y = MAP_ORIGIN_Y + last_point.y;
-                                            ctx.set(
-                                                screen_x,
-                                                screen_y,
-                                                tile.fg, // Corrected from tile.color
-                                                RGB::named(BLACK),
-                                                tile.glyph,
-                                            );
-                                        }
-                                    }            }
-
-            self.ecs.each_renderable(
-                self.active_floor,
-                self.active_world,
-                true,
-                |point, renderable| {
-                    if !self.visible_tiles.contains(&point) {
-                        return;
+                        draw_map(
+                            ctx,
+                            layer,
+                            Point::new(MAP_ORIGIN_X, MAP_ORIGIN_Y),
+                            LOG_RESERVED_ROWS,
+                            &self.visible_tiles,
+                        );
+            
+                        // Clear player's old position if they moved (this is now redundant with the below, but kept for clarity)
+                        if let Some(last_point) = self.last_player_point {
+                            let current_point = self.ecs.player_point();
+                            if last_point != current_point {
+                                if let Some(tile) = layer.tile_at(last_point) {
+                                    let screen_x = MAP_ORIGIN_X + last_point.x;
+                                    let screen_y = MAP_ORIGIN_Y + last_point.y;
+                                    ctx.set(
+                                        screen_x,
+                                        screen_y,
+                                        tile.fg,
+                                        RGB::named(BLACK),
+                                        tile.glyph,
+                                    );
+                                }
+                            }
+                        }
+            
+                        // Draw background tiles under all visible entities to ensure no lingering artifacts
+                        self.ecs.each_renderable(
+                            self.active_floor,
+                            self.active_world,
+                            true, // Include player for this pass
+                            |point, _| {
+                                if self.visible_tiles.contains(&point) {
+                                    if let Some(tile) = layer.tile_at(point) {
+                                        let screen_x = MAP_ORIGIN_X + point.x;
+                                        let screen_y = MAP_ORIGIN_Y + point.y;
+                                        ctx.set(
+                                            screen_x,
+                                            screen_y,
+                                            tile.fg,
+                                            RGB::named(BLACK),
+                                            tile.glyph,
+                                        );
+                                    }
+                                }
+                            },
+                        );
+            
+                        self.ecs.each_renderable(
+                            self.active_floor,
+                            self.active_world,
+                            true,
+                            |point, renderable| {
+                                if !self.visible_tiles.contains(&point) {
+                                    return;
+                                }
+                                let screen_x = MAP_ORIGIN_X + point.x;
+                                let screen_y = MAP_ORIGIN_Y + point.y;
+                                ctx.set(
+                                    screen_x,
+                                    screen_y,
+                                    renderable.color,
+                                    RGB::named(BLACK),
+                                    renderable.glyph,
+                                );
+                            },
+                        );
                     }
-                    let screen_x = MAP_ORIGIN_X + point.x;
-                    let screen_y = MAP_ORIGIN_Y + point.y;
-                    ctx.set(
-                        screen_x,
-                        screen_y,
-                        renderable.color,
-                        RGB::named(BLACK),
-                        renderable.glyph,
-                    );
-                },
-            );
-        }
 
         draw_log(ctx, &self.message_log, LOG_PANEL_START);
         if self.is_dead {
@@ -876,7 +904,6 @@ impl Drop for RainbowRogueState {
 fn main() -> BError {
     let context = BTermBuilder::simple80x50()
         .with_title("RainbowRogue · Spectrum Seed")
-        .with_fps_cap(30.0) // Set a lower FPS cap
         .build()?;
     let game_state = RainbowRogueState::default();
     main_loop(context, game_state)
